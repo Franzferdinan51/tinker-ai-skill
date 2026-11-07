@@ -1,0 +1,8 @@
+{
+  "usernames": ["jdoe"],
+  "names": ["Jane Doe"],
+  "emails": ["jane.doe@example.com", "jdoe@acme-robotics.com"],
+  "handles": ["janedoe", "jdoe-dev"],
+  "orgs": ["acme-robotics"],
+  "domains": ["acme-robotics.com"]
+}
