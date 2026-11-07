@@ -1,6 +1,6 @@
 # tinker-ai-skill
 
-**Turn your own coding-agent sessions into a fine-tuned model. This is the recipe behind Tess-4 and Tess-4.5, with nearly two million downloads.**
+**Turn your own coding-agent sessions into a fine-tuned model you can run locally. This is the recipe behind Tess-4 and Tess-4.5.**
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Agent Skill](https://img.shields.io/badge/Agent%20Skill-agentskills.io-black)](https://agentskills.io)
@@ -10,9 +10,10 @@
 Every session you run with a coding agent is a worked example of how you want a
 model to behave: your repositories, your conventions, your tools, your way of
 debugging. This skill hands your agent the complete, production-tested pipeline to
-turn those sessions into a supervised fine-tuning dataset and train a LoRA on
-[Tinker](https://thinkingmachines.ai/tinker). One afternoon, a few dollars to a few
-hundred, and a model that works the way you do.
+turn those sessions into a supervised fine-tuning dataset, train a LoRA on
+[Tinker](https://thinkingmachines.ai/tinker), merge it, and ship a GGUF that runs in
+llama.cpp on your own machine. One afternoon, a few dollars to a few hundred, and a
+model that works the way you do.
 
 Install it once and say: *"fine-tune Qwen3.6-35B-A3B on my Claude Code sessions from
 the last three months."* The agent takes it from there and stops before anything
@@ -21,30 +22,31 @@ that costs money.
 ## Proven on real releases
 
 We built the Tess family of agentic coding models from our own Claude Code sessions
-with exactly this method. The models are open weights on Hugging Face:
+with exactly this method, and shipped them as open weights on Hugging Face:
+[Tess-4-27B](https://huggingface.co/migtissera/Tess-4-27B)
+([GGUF](https://huggingface.co/migtissera/Tess-4-27B-GGUF),
+[EAGLE-3 draft](https://huggingface.co/migtissera/Tess-4-27B-EAGLE3)) and
+[Tess-4.5-27B](https://huggingface.co/migtissera/Tess-4.5-27B)
+([GGUF](https://huggingface.co/migtissera/Tess-4.5-27B-GGUF)). Read about them at
+[continuityresearch.ai/tess-4-5](https://continuityresearch.ai/tess-4-5).
 
-| Model | Downloads (all time, November 2026) |
-|---|---|
-| [Tess-4-27B](https://huggingface.co/migtissera/Tess-4-27B) · [GGUF](https://huggingface.co/migtissera/Tess-4-27B-GGUF) · [EAGLE-3 draft](https://huggingface.co/migtissera/Tess-4-27B-EAGLE3) | 1,116,989 |
-| [Tess-4.5-27B](https://huggingface.co/migtissera/Tess-4.5-27B) · [GGUF](https://huggingface.co/migtissera/Tess-4.5-27B-GGUF) | 837,326 |
-
-Read about the models at [continuityresearch.ai/tess-4-5](https://continuityresearch.ai/tess-4-5).
 What is in this repository is the distilled, cleaned-up version of the pipeline that
-produced them, including the mistakes we made so you do not have to.
+produced them, from raw transcripts to a quantized GGUF, including the mistakes we
+made so you do not have to.
 
 ## What you get
 
-- **One `SKILL.md`** your agent follows: a seven-step workflow with the decision
+- **One `SKILL.md`** your agent follows: a nine-step workflow with the decision
   points spelled out and the rules that cost us runs.
-- **Eight small scripts**, plain Python on top of tinker-cookbook, each with an
-  offline default and a `--help` that explains every flag.
-- **Five reference notes**: the transcript format, the anonymization policy, the
+- **Eleven small scripts**, plain Python and shell on top of tinker-cookbook and
+  llama.cpp, each with an offline default and a `--help` that explains every flag.
+- **Six reference notes**: the transcript format, the anonymization policy, the
   chunking and compaction design, Tinker training settings with the learning-rate
-  evidence, and twelve lessons learned.
+  evidence, export and serving, and the lessons learned.
 - **A synthetic transcript generator** so you can dry-run the whole pipeline in
   five minutes without touching real data or spending a cent.
 
-## The method in six steps
+## The method, from transcripts to a local model
 
 | Step | What happens | Script |
 |---|---|---|
@@ -55,6 +57,8 @@ produced them, including the mistakes we made so you do not have to.
 | 5. Split | Hold out whole sessions with a seeded hash so rebuilds and other models compare | `build_dataset.py` |
 | 6. Train | LoRA on Tinker with the cookbook trainer, tool definitions on every row, W&B connected, offline smoke test first, cost shown before launch | `train_tinker.py` |
 | 7. Check | Sample base vs checkpoints with identical rendering; judge behaviour, not loss | `sample_checkpoint.py` |
+| 8. Merge | Download the LoRA from Tinker and merge it into the base model as a standalone bf16 HuggingFace model (or a PEFT adapter for vLLM/SGLang) | `export_checkpoint.py` |
+| 9. Ship | Convert to GGUF, quantize, export the vision projector and draft head, and serve with llama.cpp using the training-matched template and sampling settings | `make_gguf.sh`, `serve_gguf.sh` |
 
 ## Why this and not a generic SFT tutorial
 
@@ -72,6 +76,9 @@ model that works and one that looks fine on the loss curve and falls apart in us
 - **Measure with the real tokenizer.** A tokenizer change moved rows by 14% and
   overflowed the budget. Rebuild per model.
 - **Judge by behaviour.** Two "collapses" had monotonically falling loss. Sample.
+- **Serve the way you trained.** A chat template that strips earlier thinking, or
+  llama.cpp's default min-p, turned a good checkpoint into garble. The serve script
+  carries the right flags.
 
 ## Quick start: five minutes on synthetic data
 
@@ -90,7 +97,8 @@ python scripts/train_tinker.py       --data-dir ./demo-data --name qwen3.6-35b-a
 ```
 
 The last command prints a decoded training row, the token count and the resolved
-configuration. Add `--train` to launch a real run.
+configuration. Add `--train` to launch a real run; afterwards
+`export_checkpoint.py` and `make_gguf.sh` take it to a GGUF you can run.
 
 ## Then on your own sessions
 
@@ -151,6 +159,8 @@ and run on your laptop.
 - A [Tinker](https://tinker.thinkingmachines.ai) API key; a [Weights & Biases](https://wandb.ai/authorize) key is optional but recommended
 - Claude Code transcripts under `~/.claude/projects/` (other agents: emit the message
   schema in `references/claude-code-transcripts.md` and continue from step 2)
+- For steps 8-9: a built [llama.cpp](https://github.com/ggml-org/llama.cpp) checkout,
+  and disk for the base model plus the merged copy
 
 ## Layout
 
@@ -162,16 +172,19 @@ scripts/anonymize_sessions.py       step 2b
 scripts/build_dataset.py            steps 3-5
 scripts/train_tinker.py             step 6
 scripts/sample_checkpoint.py        step 7
+scripts/export_checkpoint.py        step 8: download the LoRA, merge, optional PEFT adapter
+scripts/make_gguf.sh                step 9: BF16 GGUF, quantize, mmproj, MTP draft
+scripts/serve_gguf.sh               step 9: llama-server with training-matched flags
 scripts/make_sample_transcript.py   synthetic transcript for a dry run
 scripts/common.py                   shared rendering (builder, trainer and sampler render identically)
-references/                         format, anonymization, chunking, training, lessons learned
+references/                         format, anonymization, chunking, training, export and serving, lessons
 assets/system-prompt.md             a generic agent system prompt to start from
 identity.example.json, .env.example
 ```
 
 ## Data safety
 
-`data/`, `demo-*/`, `runs/`, `wandb/` and `.env` are git-ignored. The anonymizer
+`data/`, `demo-*/`, `runs/`, `export/`, `wandb/` and `.env` are git-ignored. The anonymizer
 fails rather than writing a file that still leaks. Review anonymized rows before
 training, and never publish a dataset built from transcripts that belong to someone
 else without their consent.

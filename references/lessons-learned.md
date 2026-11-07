@@ -52,6 +52,16 @@ the why.
     training rows, sample and evaluate at one effort. Mixed or missing effort means
     out-of-distribution rows and irreproducible scores.
 
-12. **Protect the originals.** Never run scrubbing in place; write derived files,
+12. **Serve the way you trained.** The stock chat template stripped earlier-turn
+    thinking that training had kept, and llama.cpp's default min-p of 0.05 plus a
+    proxy's top-p of 1.0 produced garble from a checkpoint that sampled fine on
+    Tinker. Match the template kwarg and the base model's sampling defaults, and
+    serve at least the training context; a q4_0 KV cache looped past 90K tokens.
+
+13. **Export before it expires, from the right path.** Periodic checkpoints expire
+    after 7 days; sampler checkpoints cannot be downloaded at all with current
+    tooling. Pick by evaluation, then download the training checkpoint promptly.
+
+14. **Protect the originals.** Never run scrubbing in place; write derived files,
     keep manifests with sha256s, and fail loudly when a scan finds a leak instead of
     writing a partially clean file.

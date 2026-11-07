@@ -1,6 +1,7 @@
 data/
 demo-*/
 runs/
+export/
 wandb/
 .env
 .venv/

@@ -30,8 +30,11 @@ every flag.
 3. **Environment.** `uv venv && uv pip install -r requirements.txt` (or `pip install -r requirements.txt`).
    Python 3.11+. Use that interpreter for every script.
 4. **Budget.** Training costs tokens x price. Always run a script's default (offline)
-   mode first; only `--train` and `sample_checkpoint.py` spend money. Confirm the
-   estimated cost with the user before launching.
+   mode first; only `--train`, `sample_checkpoint.py` and `export_checkpoint.py` touch
+   the service. Confirm the estimated cost with the user before launching.
+5. **For local serving (steps 8-9).** A built [llama.cpp](https://github.com/ggml-org/llama.cpp)
+   checkout recent enough for the model's architecture, disk for the base model plus
+   the merged copy (about 2 bytes per parameter each), and RAM for the largest shard.
 
 ## The workflow
 
@@ -125,7 +128,7 @@ While it runs: confirm the first metrics reach W&B, watch `test/nll` at steps 20
 40 (a dip then a rise means the LR is too hot for this batch; stop and lower it),
 and never wrap Tinker calls in your own timeouts or retries.
 
-### Step 7. Check behaviour, then export
+### Step 7. Check behaviour and pick a checkpoint
 
 ```
 python scripts/sample_checkpoint.py --data-dir ./data --name qwen3.6-35b-a3b-64k \
@@ -134,9 +137,39 @@ python scripts/sample_checkpoint.py --data-dir ./data --name qwen3.6-35b-a3b-64k
 
 Compare base vs checkpoints on prompts from the user's real work. Judge by behaviour
 (valid tool calls, non-empty thinking, follows the system prompt), not by NLL: a
-falling loss hid a behaviour regression for us twice. Pick the checkpoint by an eval,
-then download or merge weights with `tinker checkpoint download` or the cookbook's
-`weights.build_hf_model` (see `references/tinker-training.md`).
+falling loss hid a behaviour regression for us twice. Pick the checkpoint by an eval.
+
+### Step 8. Download the LoRA and merge it into the base model
+
+```
+python scripts/export_checkpoint.py --run-dir ./runs/<run> --checkpoint 000100 \
+    --base-model Qwen/Qwen3.6-35B-A3B --out ./export/my-coder --trust-remote-code
+```
+
+Reads `checkpoints.jsonl`, downloads the **training** checkpoint (sampler
+checkpoints cannot be downloaded; periodic ones expire after 7 days, so export
+before then), merges it with the cookbook's `build_hf_model` into a standalone bf16
+HuggingFace directory, copies `generation_config.json`, and prints the chat-template
+kwarg that restores the training conditioning (earlier-turn thinking kept).
+`--peft` additionally writes a PEFT adapter for vLLM or SGLang. `--dry-run` shows
+the plan without contacting Tinker. Details and memory needs:
+`references/export-and-serve.md`.
+
+### Step 9. Convert to GGUF and run with llama.cpp
+
+```
+LLAMA_CPP=~/src/llama.cpp scripts/make_gguf.sh ./export/my-coder/hf-merged ./export/my-coder/gguf my-coder Q4_K_M Q8_0
+scripts/serve_gguf.sh ./export/my-coder/gguf/my-coder-Q4_K_M.gguf
+```
+
+`make_gguf.sh` converts to BF16 GGUF with the checkout's `convert_hf_to_gguf.py`,
+quantizes with the `llama-quantize` built from the same commit, exports the vision
+projector when the model has one, and optionally the MTP draft head (`MTP=1`).
+`serve_gguf.sh` starts `llama-server` with the settings that match training:
+`--jinja`, `--reasoning-preserve`, the template kwarg for preserved thinking, a
+context of at least the training window, and the base model's sampling defaults
+(temperature 1.0, top-p 0.95, top-k 20, min-p 0). Smoke-test one prompt with a
+tool before trusting it, then benchmark against a same-recipe base GGUF.
 
 ## Rules that saved us the most time
 
@@ -147,8 +180,11 @@ then download or merge weights with `tinker checkpoint download` or the cookbook
 - Never train rows without the system prompt and tool definitions the model will be
   served with.
 - Never trust a loss curve alone. Sample.
-- Never put data, `.env`, or run directories in a public repo: the pack's
-  `.gitignore` covers `data/`, `runs/`, `wandb/`, `.env`.
+- Never serve with a chat template that strips earlier-turn thinking when training
+  kept it, and never with llama.cpp's default min-p: match the template kwarg and the
+  base model's sampling defaults.
+- Never put data, `.env`, run or export directories in a public repo: the pack's
+  `.gitignore` covers `data/`, `runs/`, `export/`, `wandb/`, `.env`.
 
 ## Adapting to other agents
 
