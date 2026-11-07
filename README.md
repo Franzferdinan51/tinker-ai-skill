@@ -144,10 +144,13 @@ Tinker bills per token. Training cost is train tokens times the model's train pr
 the smoke test prints the token count before you launch. Ballpark figures at
 November 2026 prices, one epoch of 64K rows:
 
-| Dataset | Train tokens | Qwen3.6-35B-A3B | Inkling 2 Small |
-|---|---|---|---|
-| 100 rows (a personal corpus) | ~5M | ~$6 | ~$8 |
-| 1,000 rows (what our releases used) | ~45M | ~$55 | ~$70 |
+| Dataset | Train tokens | Qwen3.6-35B-A3B | Inkling 2 Small | Qwen3.8-27B |
+|---|---|---|---|---|
+| 100 rows (a personal corpus) | ~5M | ~$6 | ~$8 | ~$21 |
+| 1,000 rows (what our releases used) | ~45M | ~$55 | ~$70 | ~$185 |
+
+Dense models cost more per token than MoE models of similar quality (Tinker prices
+by active parameters); Qwen3.8-27B is the base of Tess-4.5.
 
 Sampling and periodic evaluation are extra and small. The dataset steps are free
 and run on your laptop.
