@@ -1,4 +1,4 @@
-# finetune-on-agent-transcripts
+# tinker-ai-skill
 
 An [Agent Skill](https://agentskills.io) that teaches a coding agent (Claude Code,
 Codex, OpenCode, Cursor and any other agentskills.io-compatible agent) how to turn
@@ -21,31 +21,34 @@ only training and sampling call the Tinker service.
 
 ## Install the skill
 
-Copy (or symlink) this directory into your agent's skills location and keep the
-directory name `finetune-on-agent-transcripts`:
+Clone (or copy) this repository into your agent's skills location. The directory
+name must be `tinker-ai-skill`, which `git clone` gives you by default:
 
 | Agent | Personal (all projects) | Project (this repo) |
 |---|---|---|
-| Claude Code | `~/.claude/skills/finetune-on-agent-transcripts/` | `.claude/skills/finetune-on-agent-transcripts/` |
-| OpenAI Codex | `~/.agents/skills/finetune-on-agent-transcripts/` | `.agents/skills/finetune-on-agent-transcripts/` |
-| OpenCode | `~/.config/opencode/skills/finetune-on-agent-transcripts/` | `.opencode/skills/finetune-on-agent-transcripts/` |
+| Claude Code | `~/.claude/skills/tinker-ai-skill/` | `.claude/skills/tinker-ai-skill/` |
+| OpenAI Codex | `~/.agents/skills/tinker-ai-skill/` | `.agents/skills/tinker-ai-skill/` |
+| OpenCode | `~/.config/opencode/skills/tinker-ai-skill/` | `.opencode/skills/tinker-ai-skill/` |
 
 OpenCode also reads `.claude/skills` and `.agents/skills`, so one project copy
 serves all three. Other agents: see your agent's documentation for its skills
 directory; the format is the same `SKILL.md` + `scripts/` + `references/` layout.
 
-Clone the repository straight into a directory named after the skill (the
-directory name must match the skill's `name`):
+```
+# Claude Code
+git clone https://github.com/drost-ai/tinker-ai-skill.git ~/.claude/skills/tinker-ai-skill
+# Codex
+git clone https://github.com/drost-ai/tinker-ai-skill.git ~/.agents/skills/tinker-ai-skill
+# OpenCode
+git clone https://github.com/drost-ai/tinker-ai-skill.git ~/.config/opencode/skills/tinker-ai-skill
+```
 
-```
-git clone https://github.com/drost-ai/tinker-ai-skill.git ~/.claude/skills/finetune-on-agent-transcripts
-# Codex:    git clone https://github.com/drost-ai/tinker-ai-skill.git ~/.agents/skills/finetune-on-agent-transcripts
-# OpenCode: git clone https://github.com/drost-ai/tinker-ai-skill.git ~/.config/opencode/skills/finetune-on-agent-transcripts
-```
+Inside a repository, use the project paths from the table instead so the skill
+travels with the code.
 
 Then ask your agent, for example: "fine-tune Qwen3.6-35B-A3B on my Claude Code
-sessions from the last three months", or invoke it directly
-(`/finetune-on-agent-transcripts` in Claude Code).
+sessions from the last three months", or invoke it directly with `/tinker-ai-skill`
+in Claude Code (Codex and OpenCode pick it up from its description).
 
 ## What you need
 
@@ -59,7 +62,7 @@ sessions from the last three months", or invoke it directly
   `~/.claude/settings.json` first.
 
 ```
-cd finetune-on-agent-transcripts
+cd tinker-ai-skill
 uv venv && source .venv/bin/activate
 uv pip install -r requirements.txt
 cp .env.example .env          # fill in TINKER_API_KEY and WANDB_API_KEY

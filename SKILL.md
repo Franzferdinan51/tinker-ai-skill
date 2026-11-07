@@ -1,5 +1,5 @@
 ---
-name: finetune-on-agent-transcripts
+name: tinker-ai-skill
 description: Turn your own coding-agent session transcripts (Claude Code JSONL) into a supervised fine-tuning dataset and train a LoRA on Tinker with the tinker-cookbook. Use when the user wants to fine-tune a model on their agent sessions, build an SFT dataset from transcripts, anonymize or de-identify transcripts, slice long sessions to a context length with compaction context, or train and evaluate on Tinker. Covers collection, cleaning (secrets, PII, paths), chunking, train/val splits, training, sampling, and the pitfalls that cost us runs.
 license: MIT
 compatibility: Python 3.11+, uv or pip, tinker-cookbook>=0.6.0 (installs tinker, torch, tml-renderers), a Tinker API key, optionally a Weights & Biases API key. Scripts run from the skill directory; dataset steps are offline, training and sampling call the Tinker service and cost money.
@@ -16,7 +16,7 @@ training data, and fine-tune an open model on it with [Tinker](https://thinkingm
 This skill distils a pipeline that shipped several public models. Follow the steps
 in order; each script is small, offline unless stated, and prints what it did.
 
-All commands below run from this skill's directory. Read `references/` when a step
+All commands below run from this skill's directory (`tinker-ai-skill`). Read `references/` when a step
 needs judgement; the scripts' docstrings (`python scripts/<name>.py --help`) explain
 every flag.
 

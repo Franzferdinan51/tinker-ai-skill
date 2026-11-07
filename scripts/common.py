@@ -1,4 +1,4 @@
-"""Shared helpers for the finetune-on-agent-transcripts scripts.
+"""Shared helpers for the tinker-ai-skill scripts.
 
 Standard library plus tinker-cookbook. Every script imports from here so the
 dataset builder, the trainer and the sampler render conversations identically.
