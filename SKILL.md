@@ -4,9 +4,9 @@ description: Turn your own coding-agent session transcripts (Claude Code JSONL) 
 license: MIT
 compatibility: Python 3.11+, uv or pip, tinker-cookbook>=0.6.0 (installs tinker, torch, tml-renderers), a Tinker API key, optionally a Weights & Biases API key. Scripts run from the skill directory; dataset steps are offline, training and sampling call the Tinker service and cost money.
 metadata:
-  author: Trinity Cloud
+  author: Migel Tissera
   version: "1.0.0"
-  source: https://github.com/trinity-cloud/fine-tuning-fable
+  source: https://github.com/drost-ai/tinker-ai-skill
 ---
 
 # Fine-tune a coding model on your own agent transcripts (Tinker)

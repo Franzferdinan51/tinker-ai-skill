@@ -34,10 +34,13 @@ OpenCode also reads `.claude/skills` and `.agents/skills`, so one project copy
 serves all three. Other agents: see your agent's documentation for its skills
 directory; the format is the same `SKILL.md` + `scripts/` + `references/` layout.
 
+Clone the repository straight into a directory named after the skill (the
+directory name must match the skill's `name`):
+
 ```
-git clone https://github.com/trinity-cloud/fine-tuning-fable.git
-mkdir -p ~/.claude/skills
-cp -r fine-tuning-fable/finetune-on-agent-transcripts ~/.claude/skills/
+git clone https://github.com/drost-ai/tinker-ai-skill.git ~/.claude/skills/finetune-on-agent-transcripts
+# Codex:    git clone https://github.com/drost-ai/tinker-ai-skill.git ~/.agents/skills/finetune-on-agent-transcripts
+# OpenCode: git clone https://github.com/drost-ai/tinker-ai-skill.git ~/.config/opencode/skills/finetune-on-agent-transcripts
 ```
 
 Then ask your agent, for example: "fine-tune Qwen3.6-35B-A3B on my Claude Code
@@ -109,7 +112,7 @@ assets/system-prompt.md        a generic agent system prompt to start from
 rows before training, and never publish a dataset built from transcripts that
 belong to someone else without their consent.
 
-## License
+## Author and license
 
-MIT. Tinker and tinker-cookbook are products of Thinking Machines Lab; this skill
-is an independent guide.
+Written by Migel Tissera. MIT license. Tinker and tinker-cookbook are products of
+Thinking Machines Lab; this skill is an independent guide.
