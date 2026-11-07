@@ -1,38 +1,119 @@
 # tinker-ai-skill
 
-An [Agent Skill](https://agentskills.io) that teaches a coding agent (Claude Code,
-Codex, OpenCode, Cursor and any other agentskills.io-compatible agent) how to turn
-your own agent session transcripts into a supervised fine-tuning dataset and train a
-LoRA on [Tinker](https://thinkingmachines.ai/tinker) with the
-[tinker-cookbook](https://github.com/thinking-machines-lab/tinker-cookbook).
+**Turn your own coding-agent sessions into a fine-tuned model. This is the recipe behind Tess-4 and Tess-4.5, with nearly two million downloads.**
 
-It packages the pipeline we used to ship the Tess family of agentic coding models:
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Agent Skill](https://img.shields.io/badge/Agent%20Skill-agentskills.io-black)](https://agentskills.io)
+[![Works with](https://img.shields.io/badge/works%20with-Claude%20Code%20%C2%B7%20Codex%20%C2%B7%20OpenCode-brightgreen)](#install-the-skill)
+[![Trains on](https://img.shields.io/badge/trains%20on-Tinker-7b3fe4)](https://thinkingmachines.ai/tinker)
 
-1. collect Claude Code session transcripts into a dataset location;
-2. clean them: drop harness noise, replace credentials by value, de-identify people
-   and paths with a per-session randomized identity;
-3. slice sessions to the model's context length at safe tool boundaries;
-4. prepend a deterministic compaction context to every slice after the first;
-5. split train/val by whole session;
-6. fine-tune on Tinker, with Weights & Biases connected, then sample checkpoints.
+Every session you run with a coding agent is a worked example of how you want a
+model to behave: your repositories, your conventions, your tools, your way of
+debugging. This skill hands your agent the complete, production-tested pipeline to
+turn those sessions into a supervised fine-tuning dataset and train a LoRA on
+[Tinker](https://thinkingmachines.ai/tinker). One afternoon, a few dollars to a few
+hundred, and a model that works the way you do.
 
-Everything is plain Python on top of tinker-cookbook. The dataset steps run offline;
-only training and sampling call the Tinker service.
+Install it once and say: *"fine-tune Qwen3.6-35B-A3B on my Claude Code sessions from
+the last three months."* The agent takes it from there and stops before anything
+that costs money.
+
+## Proven on real releases
+
+We built the Tess family of agentic coding models from our own Claude Code sessions
+with exactly this method. The models are open weights on Hugging Face:
+
+| Model | Downloads (all time, November 2026) |
+|---|---|
+| [Tess-4-27B](https://huggingface.co/migtissera/Tess-4-27B) · [GGUF](https://huggingface.co/migtissera/Tess-4-27B-GGUF) · [EAGLE-3 draft](https://huggingface.co/migtissera/Tess-4-27B-EAGLE3) | 1,116,989 |
+| [Tess-4.5-27B](https://huggingface.co/migtissera/Tess-4.5-27B) · [GGUF](https://huggingface.co/migtissera/Tess-4.5-27B-GGUF) | 837,326 |
+
+Read about the models at [continuityresearch.ai/tess-4-5](https://continuityresearch.ai/tess-4-5).
+What is in this repository is the distilled, cleaned-up version of the pipeline that
+produced them, including the mistakes we made so you do not have to.
+
+## What you get
+
+- **One `SKILL.md`** your agent follows: a seven-step workflow with the decision
+  points spelled out and the rules that cost us runs.
+- **Eight small scripts**, plain Python on top of tinker-cookbook, each with an
+  offline default and a `--help` that explains every flag.
+- **Five reference notes**: the transcript format, the anonymization policy, the
+  chunking and compaction design, Tinker training settings with the learning-rate
+  evidence, and twelve lessons learned.
+- **A synthetic transcript generator** so you can dry-run the whole pipeline in
+  five minutes without touching real data or spending a cent.
+
+## The method in six steps
+
+| Step | What happens | Script |
+|---|---|---|
+| 1. Collect | Copy Claude Code transcripts verbatim, with checksums; skip subagents and tiny sessions; exclude whole projects that must stay private | `collect_sessions.py` |
+| 2. Clean | Normalize to OpenAI-style messages; drop harness noise; replace every credential by value; give each session its own random identity for usernames, folders, names, emails, orgs; fail if anything leaks | `normalize_sessions.py`, `anonymize_sessions.py` |
+| 3. Slice | Cut sessions to the model's context length, measured with the model's real renderer, never splitting a tool call from its result | `build_dataset.py` |
+| 4. Compact | Give every slice after the first a deterministic working-context block and a continuation bridge, the way a real harness compacts | `build_dataset.py` |
+| 5. Split | Hold out whole sessions with a seeded hash so rebuilds and other models compare | `build_dataset.py` |
+| 6. Train | LoRA on Tinker with the cookbook trainer, tool definitions on every row, W&B connected, offline smoke test first, cost shown before launch | `train_tinker.py` |
+| 7. Check | Sample base vs checkpoints with identical rendering; judge behaviour, not loss | `sample_checkpoint.py` |
+
+## Why this and not a generic SFT tutorial
+
+Agent transcripts are not chat data. The details below are the difference between a
+model that works and one that looks fine on the loss curve and falls apart in use.
+
+- **Per-session anonymization.** A single constant fake world in every row was
+  memorized and later asserted over the real environment. Randomize per session.
+- **Compaction context on continuation slices.** Long sessions outlive the context
+  window; the model must learn to continue from a summary, not from nothing.
+- **Tool definitions and the system prompt on every row.** Rows without them
+  regressed tool use even though NLL improved.
+- **Thinking kept in history.** Hybrid renderers silently strip earlier reasoning and
+  train empty think blocks; the scripts rebuild the renderer to keep it.
+- **Measure with the real tokenizer.** A tokenizer change moved rows by 14% and
+  overflowed the budget. Rebuild per model.
+- **Judge by behaviour.** Two "collapses" had monotonically falling loss. Sample.
+
+## Quick start: five minutes on synthetic data
+
+```
+git clone https://github.com/drost-ai/tinker-ai-skill.git ~/.claude/skills/tinker-ai-skill
+cd ~/.claude/skills/tinker-ai-skill
+uv venv && source .venv/bin/activate && uv pip install -r requirements.txt
+
+python scripts/make_sample_transcript.py --out ./demo-claude-projects --turns 14 --long-results
+python scripts/collect_sessions.py   --claude-dir ./demo-claude-projects --data-dir ./demo-data --min-bytes 1000
+python scripts/normalize_sessions.py --data-dir ./demo-data
+python scripts/anonymize_sessions.py --data-dir ./demo-data --name "Taylor Quintrell"
+python scripts/build_dataset.py      --data-dir ./demo-data --model Qwen/Qwen3.6-35B-A3B --max-len 8192 \
+                                     --system-prompt-file assets/system-prompt.md
+python scripts/train_tinker.py       --data-dir ./demo-data --name qwen3.6-35b-a3b-8k   # offline smoke test
+```
+
+The last command prints a decoded training row, the token count and the resolved
+configuration. Add `--train` to launch a real run.
+
+## Then on your own sessions
+
+1. Raise Claude Code's transcript retention first: `"cleanupPeriodDays": 3650` in
+   `~/.claude/settings.json`. The default deletes sessions after 30 days.
+2. Copy `.env.example` to `.env` and add your `TINKER_API_KEY` and `WANDB_API_KEY`.
+3. Write `identity.json` (see `identity.example.json`): your usernames, full name,
+   emails, handles, company, domains.
+4. Follow `SKILL.md`, or let your agent drive. The decisions that stay yours: which
+   projects to exclude, which model and context length, the system prompt and tool
+   definitions of the harness you will serve in, and the learning rate when Tinker
+   has no calibrated default.
 
 ## Install the skill
 
-Clone (or copy) this repository into your agent's skills location. The directory
-name must be `tinker-ai-skill`, which `git clone` gives you by default:
+Clone into your agent's skills directory. The directory name must be
+`tinker-ai-skill`, which `git clone` gives you by default:
 
 | Agent | Personal (all projects) | Project (this repo) |
 |---|---|---|
 | Claude Code | `~/.claude/skills/tinker-ai-skill/` | `.claude/skills/tinker-ai-skill/` |
 | OpenAI Codex | `~/.agents/skills/tinker-ai-skill/` | `.agents/skills/tinker-ai-skill/` |
 | OpenCode | `~/.config/opencode/skills/tinker-ai-skill/` | `.opencode/skills/tinker-ai-skill/` |
-
-OpenCode also reads `.claude/skills` and `.agents/skills`, so one project copy
-serves all three. Other agents: see your agent's documentation for its skills
-directory; the format is the same `SKILL.md` + `scripts/` + `references/` layout.
 
 ```
 # Claude Code
@@ -43,79 +124,63 @@ git clone https://github.com/drost-ai/tinker-ai-skill.git ~/.agents/skills/tinke
 git clone https://github.com/drost-ai/tinker-ai-skill.git ~/.config/opencode/skills/tinker-ai-skill
 ```
 
-Inside a repository, use the project paths from the table instead so the skill
-travels with the code.
+OpenCode also reads `.claude/skills` and `.agents/skills`, so one project copy serves
+all three. Any other agent that supports the [Agent Skills](https://agentskills.io)
+standard works the same way. Invoke it directly with `/tinker-ai-skill` in Claude
+Code; Codex and OpenCode pick it up from its description.
 
-Then ask your agent, for example: "fine-tune Qwen3.6-35B-A3B on my Claude Code
-sessions from the last three months", or invoke it directly with `/tinker-ai-skill`
-in Claude Code (Codex and OpenCode pick it up from its description).
+## What it costs
 
-## What you need
+Tinker bills per token. Training cost is train tokens times the model's train price
+(see the [price list](https://tinker-docs.thinkingmachines.ai/tinker/models/models_and_pricing/));
+the smoke test prints the token count before you launch. Ballpark figures at
+November 2026 prices, one epoch of 64K rows:
 
-- Python 3.11+ and [uv](https://docs.astral.sh/uv/) (or pip).
-- A Tinker account and API key: https://tinker.thinkingmachines.ai (training and
-  sampling are billed per token; prices at
-  https://tinker-docs.thinkingmachines.ai/tinker/models/models_and_pricing/).
-- Optional but recommended: a Weights & Biases API key, https://wandb.ai/authorize.
-- Your transcripts. Claude Code stores them under `~/.claude/projects/` and deletes
-  them after 30 days by default; set `"cleanupPeriodDays": 3650` in
-  `~/.claude/settings.json` first.
+| Dataset | Train tokens | Qwen3.6-35B-A3B | Inkling 2 Small |
+|---|---|---|---|
+| 100 rows (a personal corpus) | ~5M | ~$6 | ~$8 |
+| 1,000 rows (what our releases used) | ~45M | ~$55 | ~$70 |
 
-```
-cd tinker-ai-skill
-uv venv && source .venv/bin/activate
-uv pip install -r requirements.txt
-cp .env.example .env          # fill in TINKER_API_KEY and WANDB_API_KEY
-```
+Sampling and periodic evaluation are extra and small. The dataset steps are free
+and run on your laptop.
 
-## Try it in five minutes on synthetic data
+## Requirements
 
-```
-python scripts/make_sample_transcript.py --out ./demo-claude-projects --turns 14 --long-results
-python scripts/collect_sessions.py   --claude-dir ./demo-claude-projects --data-dir ./demo-data --min-bytes 1000
-python scripts/normalize_sessions.py --data-dir ./demo-data
-python scripts/anonymize_sessions.py --data-dir ./demo-data --name "Taylor Quintrell"
-python scripts/build_dataset.py      --data-dir ./demo-data --model Qwen/Qwen3.6-35B-A3B --max-len 8192 \
-                                     --system-prompt-file assets/system-prompt.md
-python scripts/train_tinker.py       --data-dir ./demo-data --name qwen3.6-35b-a3b-8k        # offline smoke test
-```
-
-The last command prints a decoded training row and the token count. Add `--train`
-to launch a real run (this one is tiny and cheap; a real dataset of a few hundred
-64K rows costs on the order of $50-$150 per epoch on a mid-size MoE).
-
-## Then on your own sessions
-
-Follow `SKILL.md` step by step, or let your agent drive. The important human
-decisions are: which projects to exclude, what goes in the identity file
-(`identity.example.json`), which model and context length, the system prompt and
-tool definitions of the harness you will serve the model in, and the learning rate
-when Tinker has no calibrated default for the model.
+- Python 3.11+ and [uv](https://docs.astral.sh/uv/) (or pip)
+- `tinker-cookbook>=0.6.0` (installs `tinker`, `torch`, `tml-renderers`) and `wandb`
+- A [Tinker](https://tinker.thinkingmachines.ai) API key; a [Weights & Biases](https://wandb.ai/authorize) key is optional but recommended
+- Claude Code transcripts under `~/.claude/projects/` (other agents: emit the message
+  schema in `references/claude-code-transcripts.md` and continue from step 2)
 
 ## Layout
 
 ```
-SKILL.md                       instructions the agent follows
-README.md                      this file
-scripts/collect_sessions.py    step 1
-scripts/normalize_sessions.py  step 2a
-scripts/anonymize_sessions.py  step 2b
-scripts/build_dataset.py       steps 3-5
-scripts/train_tinker.py        step 6
-scripts/sample_checkpoint.py   step 7
+SKILL.md                            instructions the agent follows
+scripts/collect_sessions.py         step 1
+scripts/normalize_sessions.py       step 2a
+scripts/anonymize_sessions.py       step 2b
+scripts/build_dataset.py            steps 3-5
+scripts/train_tinker.py             step 6
+scripts/sample_checkpoint.py        step 7
 scripts/make_sample_transcript.py   synthetic transcript for a dry run
-scripts/common.py              shared rendering helpers (builder and trainer render identically)
-references/                    format, anonymization, chunking, training, lessons learned
-assets/system-prompt.md        a generic agent system prompt to start from
+scripts/common.py                   shared rendering (builder, trainer and sampler render identically)
+references/                         format, anonymization, chunking, training, lessons learned
+assets/system-prompt.md             a generic agent system prompt to start from
+identity.example.json, .env.example
 ```
 
 ## Data safety
 
-`data/`, `demo-*/`, `runs/`, `wandb/` and `.env` are git-ignored. Review anonymized
-rows before training, and never publish a dataset built from transcripts that
-belong to someone else without their consent.
+`data/`, `demo-*/`, `runs/`, `wandb/` and `.env` are git-ignored. The anonymizer
+fails rather than writing a file that still leaks. Review anonymized rows before
+training, and never publish a dataset built from transcripts that belong to someone
+else without their consent.
 
 ## Author and license
 
-Written by Migel Tissera. MIT license. Tinker and tinker-cookbook are products of
-Thinking Machines Lab; this skill is an independent guide.
+Written by [Migel Tissera](https://huggingface.co/migtissera), creator of the Tess
+models. MIT license. Tinker and tinker-cookbook are products of Thinking Machines
+Lab; this skill is an independent guide built on them.
+
+If this saved you a failed training run, star the repository and share what you
+trained.
